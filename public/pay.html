@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Flamingo Pay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FFF3EE;
+    --card:#FFFFFF;
+    --ink:#241F26;
+    --muted:#8C8288;
+    --flamingo:#E8496B;
+    --flamingo-dark:#C22F53;
+    --teal:#2F6E62;
+    --line:#F1DED8;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    min-height:100vh;
+    background:var(--bg);
+    font-family:'Work Sans',sans-serif;
+    color:var(--ink);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+  }
+  .card{
+    width:100%;
+    max-width:380px;
+  }
+  .wordmark{
+    text-align:center;
+    font-family:'Work Sans',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    letter-spacing:0.02em;
+    color:var(--flamingo-dark);
+    margin-bottom:28px;
+  }
+
+  /* --- waiting state --- */
+  .waiting{
+    text-align:center;
+    padding:56px 8px;
+  }
+  .feather{
+    width:64px;
+    height:64px;
+    margin:0 auto 20px;
+    opacity:0.55;
+    animation:sway 2.4s ease-in-out infinite;
+  }
+  @keyframes sway{
+    0%,100%{ transform:rotate(-4deg); }
+    50%{ transform:rotate(4deg); }
+  }
+  .waiting p{
+    color:var(--muted);
+    font-size:15px;
+    margin:0;
+  }
+
+  /* --- bill state --- */
+  .bill{ display:none; }
+  .bill.show{ display:block; }
+  .amount-block{
+    text-align:center;
+    margin-bottom:28px;
+  }
+  .amount-label{
+    font-size:14px;
+    color:var(--muted);
+    margin-bottom:6px;
+  }
+  .amount{
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    font-size:52px;
+    line-height:1;
+    position:relative;
+    display:inline-block;
+  }
+  .amount::after{
+    content:"";
+    position:absolute;
+    left:6%;
+    right:6%;
+    bottom:-10px;
+    height:10px;
+    border-radius:0 0 40px 40px;
+    background:var(--flamingo);
+    opacity:0.22;
+  }
+  .merchant-name{
+    margin-top:14px;
+    font-size:14px;
+    color:var(--muted);
+  }
+
+  .parts{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+  .part-btn{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    width:100%;
+    padding:16px 20px;
+    border-radius:14px;
+    border:1px solid var(--line);
+    background:var(--card);
+    text-decoration:none;
+    color:var(--ink);
+    font-family:'Work Sans',sans-serif;
+    transition:transform .12s ease, border-color .12s ease;
+  }
+  .part-btn:active{ transform:scale(0.98); }
+  .part-btn.primary{
+    background:var(--flamingo);
+    border-color:var(--flamingo);
+    color:#fff;
+  }
+  .part-label{
+    font-size:13px;
+    color:var(--muted);
+  }
+  .part-btn.primary .part-label{ color:rgba(255,255,255,0.8); }
+  .part-amount{
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    font-size:20px;
+  }
+  .part-left{ display:flex; flex-direction:column; gap:3px; align-items:flex-start; }
+
+  .paid-hint{
+    text-align:center;
+    font-size:13px;
+    color:var(--teal);
+    margin-top:18px;
+    min-height:18px;
+  }
+
+  .badge{
+    margin-top:36px;
+    text-align:center;
+  }
+  .badge span{
+    display:inline-block;
+    padding:7px 14px;
+    border-radius:999px;
+    background:var(--card);
+    border:1px solid var(--line);
+    font-size:12px;
+    color:var(--muted);
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="wordmark">Flamingo Pay</div>
+
+  <div class="waiting" id="waiting">
+    <svg class="feather" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M32 4C20 4 12 18 12 32c0 14 8 20 20 20s20-6 20-20C52 18 44 4 32 4Z" stroke="#E8496B" stroke-width="2.5"/>
+      <path d="M32 12v40" stroke="#E8496B" stroke-width="2.5" stroke-linecap="round"/>
+    </svg>
+    <p>Waiting for the shopkeeper to send the bill…</p>
+  </div>
+
+  <div class="bill" id="bill">
+    <div class="amount-block">
+      <div class="amount-label">Total bill</div>
+      <div class="amount" id="totalAmount">₹0</div>
+      <div class="merchant-name" id="merchantName"></div>
+    </div>
+
+    <div class="parts" id="parts"></div>
+
+    <div class="paid-hint" id="paidHint"></div>
+  </div>
+
+  <div class="badge"><span>Powered by Flamingo Group</span></div>
+</div>
+
+<script>
+  const merchantId = window.location.pathname.split("/").filter(Boolean).pop();
+  const waitingEl = document.getElementById("waiting");
+  const billEl = document.getElementById("bill");
+  const totalEl = document.getElementById("totalAmount");
+  const merchantEl = document.getElementById("merchantName");
+  const partsEl = document.getElementById("parts");
+  const hintEl = document.getElementById("paidHint");
+
+  let lastRenderedAmount = null;
+
+  function rupees(n) {
+    return "₹" + n.toLocaleString("en-IN");
+  }
+
+  function buildUpiLink(vpa, name, amount, note) {
+    const params = new URLSearchParams({
+      pa: vpa,
+      pn: name,
+      am: String(amount),
+      cu: "INR",
+      tn: note,
+    });
+    return "upi://pay?" + params.toString();
+  }
+
+  function render(data) {
+    if (!data.active || !data.bill) {
+      waitingEl.style.display = "block";
+      billEl.classList.remove("show");
+      lastRenderedAmount = null;
+      return;
+    }
+
+    waitingEl.style.display = "none";
+    billEl.classList.add("show");
+
+    if (lastRenderedAmount === data.bill.amount) return; // avoid re-render flicker
+    lastRenderedAmount = data.bill.amount;
+
+    totalEl.textContent = rupees(data.bill.amount);
+    merchantEl.textContent = data.merchant?.name ? "at " + data.merchant.name : "";
+
+    partsEl.innerHTML = "";
+    const parts = data.bill.parts || [];
+    const vpa = data.merchant?.vpa;
+    const name = data.merchant?.name || "Merchant";
+
+    parts.forEach((amt, i) => {
+      const a = document.createElement("a");
+      a.className = "part-btn" + (i === 0 ? " primary" : "");
+      a.href = vpa
+        ? buildUpiLink(vpa, name, amt, `Flamingo Pay part ${i + 1}`)
+        : "#";
+      a.innerHTML = `
+        <span class="part-left">
+          <span class="part-label">Part ${i + 1} of ${parts.length}</span>
+          <span class="part-amount">${rupees(amt)}</span>
+        </span>
+        <span>${i === 0 ? "Pay now →" : "Pay →"}</span>
+      `;
+      partsEl.appendChild(a);
+    });
+
+    hintEl.textContent = parts.length > 1
+      ? "Pay each part in order — your UPI app will open automatically."
+      : "Your UPI app will open automatically.";
+  }
+
+  async function poll() {
+    try {
+      const res = await fetch(`/api/bill/${merchantId}`);
+      const data = await res.json();
+      render(data);
+    } catch (e) {
+      // silent — will retry on next tick
+    }
+  }
+
+  poll();
+  setInterval(poll, 2500);
+</script>
+
+</body>
+</html>
